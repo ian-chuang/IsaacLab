@@ -42,6 +42,7 @@ known_third_party = [
     "omni.isaac.core",
     "omni.replicator.isaac",
     "omni.replicator.core",
+    "omni.isaac.manipulators",
     "pxr",
     "omni.kit.*",
     "warp",

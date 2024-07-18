@@ -33,6 +33,9 @@ simulation_app = app_launcher.app
 
 import omni.isaac.core.utils.prims as prim_utils
 
+import omni.replicator.core
+import omni.isaac.manipulators
+
 import omni.isaac.lab.sim as sim_utils
 from omni.isaac.lab.utils.assets import ISAAC_NUCLEUS_DIR
 

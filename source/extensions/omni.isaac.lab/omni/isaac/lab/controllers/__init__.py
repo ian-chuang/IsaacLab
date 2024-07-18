@@ -13,3 +13,7 @@ commands to be sent to the robot.
 
 from .differential_ik import DifferentialIKController
 from .differential_ik_cfg import DifferentialIKControllerCfg
+
+
+
+import omni.isaac.manipulators

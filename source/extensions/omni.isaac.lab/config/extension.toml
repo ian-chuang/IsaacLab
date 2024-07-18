@@ -15,6 +15,7 @@ keywords = ["kit", "robotics", "learning", "ai"]
 "omni.isaac.core" = {}
 "omni.isaac.ml_archive" = {}
 "omni.replicator.core" = {}
+"omni.isaac.manipulators" = {}
 
 [python.pipapi]
 requirements = [
