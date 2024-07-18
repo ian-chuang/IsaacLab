@@ -1,23 +1,3 @@
-# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
-"""
-This script demonstrates how to use the differential inverse kinematics controller with the simulator.
-
-The differential IK controller can be configured in different modes. It uses the Jacobians computed by
-PhysX. This helps perform parallelized computation of the inverse kinematics.
-
-.. code-block:: bash
-
-    # Usage
-    ./isaaclab.sh -p source/standalone/tutorials/05_controllers/ik_control.py
-
-"""
-
-"""Launch Isaac Sim Simulator first."""
-
 import argparse
 
 from omni.isaac.lab.app import AppLauncher
@@ -25,7 +5,8 @@ from omni.isaac.lab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Tutorial on using the differential IK controller.")
 parser.add_argument("--robot", type=str, default="franka_panda", help="Name of the robot.")
-parser.add_argument("--num_envs", type=int, default=128, help="Number of environments to spawn.")
+parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser.add_argument("--cpu", type=bool, default=True, help="Use CPU for simulation.")
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -40,7 +21,7 @@ simulation_app = app_launcher.app
 import torch
 
 import omni.isaac.lab.sim as sim_utils
-from omni.isaac.lab.assets import AssetBaseCfg
+from omni.isaac.lab.assets import AssetBaseCfg, RigidObjectCfg
 from omni.isaac.lab.controllers import DifferentialIKController, DifferentialIKControllerCfg
 from omni.isaac.lab.managers import SceneEntityCfg
 from omni.isaac.lab.markers import VisualizationMarkers
@@ -53,40 +34,53 @@ from omni.isaac.lab.utils.math import subtract_frame_transforms
 ##
 # Pre-defined configs
 ##
-from omni.isaac.lab_assets import FRANKA_PANDA_HIGH_PD_CFG, UR10_CFG  # isort:skip
-
+from ur5e_picke import UR5e_PICKe_CFG
 
 @configclass
 class TableTopSceneCfg(InteractiveSceneCfg):
     """Configuration for a cart-pole scene."""
 
-    # ground plane
-    ground = AssetBaseCfg(
-        prim_path="/World/defaultGroundPlane",
-        spawn=sim_utils.GroundPlaneCfg(),
-        init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, -1.05)),
-    )
+    def __init__(self, num_envs, env_spacing, num_blocks=1):
+        super().__init__(num_envs=num_envs, env_spacing=env_spacing)
+        # ground plane
+        self.ground = AssetBaseCfg(
+            prim_path="/World/defaultGroundPlane",
+            spawn=sim_utils.GroundPlaneCfg(),
+            init_state=AssetBaseCfg.InitialStateCfg(pos=(0.0, 0.0, -1.05)),
+        )
 
-    # lights
-    dome_light = AssetBaseCfg(
-        prim_path="/World/Light", spawn=sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
-    )
+        # lights
+        self.dome_light = AssetBaseCfg(
+            prim_path="/World/Light", spawn=sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
+        )
 
-    # mount
-    table = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/Table",
-        spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/Stand/stand_instanceable.usd", scale=(2.0, 2.0, 2.0)
-        ),
-    )
+        # Table
+        self.table = AssetBaseCfg(
+            prim_path="{ENV_REGEX_NS}/Table",
+            init_state=AssetBaseCfg.InitialStateCfg(pos=[0.5, 0, 0], rot=[0.707, 0, 0, 0.707]),
+            spawn=sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/Mounts/SeattleLabTable/table_instanceable.usd"),
+        )
 
-    # articulation
-    if args_cli.robot == "franka_panda":
-        robot = FRANKA_PANDA_HIGH_PD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-    elif args_cli.robot == "ur10":
-        robot = UR10_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-    else:
-        raise ValueError(f"Robot {args_cli.robot} is not supported. Valid: franka_panda, ur10")
+        # articulation
+        self.robot = UR5e_PICKe_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+        # blocks
+        for i in range(num_blocks):
+            # set block attr
+            setattr(self, f"block{i}", AssetBaseCfg(
+                prim_path="{ENV_REGEX_NS}/Block{i}",
+                spawn=sim_utils.CuboidCfg(
+                    # random size between .1 and .15
+                    size= (0.1, 0.1, 0.1),
+                    rigid_props=sim_utils.RigidBodyPropertiesCfg(),
+                    # random mass between 0.5 and 1.5
+                    mass_props=sim_utils.MassPropertiesCfg(mass=0.5 + 1.0 * torch.rand(1).item()),
+                    collision_props=sim_utils.CollisionPropertiesCfg(),
+                    # random color
+                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0,0.0,0.0), metallic=0.2),
+                ),
+                init_state=RigidObjectCfg.InitialStateCfg(),
+            ))
 
 
 def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
@@ -107,8 +101,6 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 
     # Define goals for the arm
     ee_goals = [
-        [0.5, 0.5, 0.7, 0.707, 0, 0.707, 0],
-        [0.5, -0.4, 0.6, 0.707, 0.707, 0.0, 0.0],
         [0.5, 0, 0.5, 0.0, 1.0, 0.0, 0.0],
     ]
     ee_goals = torch.tensor(ee_goals, device=sim.device)
@@ -118,13 +110,19 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     ik_commands = torch.zeros(scene.num_envs, diff_ik_controller.action_dim, device=robot.device)
     ik_commands[:] = ee_goals[current_goal_idx]
 
-    # Specify robot-specific parameters
-    if args_cli.robot == "franka_panda":
-        robot_entity_cfg = SceneEntityCfg("robot", joint_names=["panda_joint.*"], body_names=["panda_hand"])
-    elif args_cli.robot == "ur10":
-        robot_entity_cfg = SceneEntityCfg("robot", joint_names=[".*"], body_names=["ee_link"])
-    else:
-        raise ValueError(f"Robot {args_cli.robot} is not supported. Valid: franka_panda, ur10")
+    robot_entity_cfg = SceneEntityCfg(
+        "robot", 
+        joint_names=[
+            "shoulder_pan_joint",
+            "shoulder_lift_joint",
+            "elbow_joint",
+            "wrist_1_joint", 
+            "wrist_2_joint", 
+            "wrist_3_joint",
+        ],
+        body_names=["tcp"]
+    )
+
     # Resolving the scene entities
     robot_entity_cfg.resolve(scene)
     # Obtain the frame index of the end-effector
@@ -147,8 +145,6 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
             # reset joint state
             joint_pos = robot.data.default_joint_pos.clone()
             joint_vel = robot.data.default_joint_vel.clone()
-            # print device of tensor
-            print(f"Device of joint_pos: {joint_pos.device}")
             robot.write_joint_state_to_sim(joint_pos, joint_vel)
             robot.reset()
             # reset actions
@@ -192,12 +188,17 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
 def main():
     """Main function."""
     # Load kit helper
-    sim_cfg = sim_utils.SimulationCfg(dt=0.01, use_gpu_pipeline=False)
+    sim_cfg = sim_utils.SimulationCfg(
+        dt=0.01,
+        use_gpu_pipeline= not args_cli.cpu,
+        device= "cpu" if args_cli.cpu else "cuda",
+    )
     sim = sim_utils.SimulationContext(sim_cfg)
     # Set main camera
     sim.set_camera_view([2.5, 2.5, 2.5], [0.0, 0.0, 0.0])
     # Design scene
-    scene_cfg = TableTopSceneCfg(num_envs=2, env_spacing=2.0)
+    scene_cfg = TableTopSceneCfg(num_envs=args_cli.num_envs, env_spacing=2.0)
+
     scene = InteractiveScene(scene_cfg)
     # Play the simulator
     sim.reset()

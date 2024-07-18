@@ -100,7 +100,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, RigidObj
             # sample a random position on a cylinder around the origins
             root_state[:, :3] += origins
             root_state[:, :3] += math_utils.sample_cylinder(
-                radius=0.1, h_range=(0.25, 0.5), size=cone_object.num_instances, device=cone_object.device
+                radius=0.1, h_range=(0.25, 0.5), size=cone_object.num_instances, device=sim.device
             )
             # write root state to simulation
             cone_object.write_root_state_to_sim(root_state)
@@ -125,7 +125,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, RigidObj
 def main():
     """Main function."""
     # Load kit helper
-    sim_cfg = sim_utils.SimulationCfg()
+    sim_cfg = sim_utils.SimulationCfg(device="cpu",use_gpu_pipeline=False)
     sim = SimulationContext(sim_cfg)
     # Set main camera
     sim.set_camera_view(eye=[1.5, 0.0, 1.0], target=[0.0, 0.0, 0.0])
