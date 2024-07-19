@@ -28,7 +28,7 @@ UR5e_PICKe_CFG = ArticulationCfg(
             velocity_limit=3.14,
             effort_limit=87.0,
             stiffness=400.0,
-            damping=80.0,
+            damping=100.0,
         ),
     },
 )

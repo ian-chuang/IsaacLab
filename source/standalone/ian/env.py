@@ -28,6 +28,14 @@ from omni.isaac.lab.utils.math import subtract_frame_transforms
 from omni.isaac.lab.sensors import CameraCfg, ContactSensorCfg, RayCasterCfg, patterns
 from omni.isaac.manipulators.grippers.surface_gripper import SurfaceGripper
 
+COLORS = [
+    (51/255, 204/255, 51/255),
+    (255/255, 255/255, 0/255),
+    (255/255, 0/255, 0/255),
+    (255/255, 204/255, 102/255),
+    (255/255, 153/255, 0/255),
+]
+
 @configclass
 class BlockStackingSceneCfg(InteractiveSceneCfg):
     """Configuration for a cart-pole scene."""
@@ -58,36 +66,51 @@ class BlockStackingSceneCfg(InteractiveSceneCfg):
 
         # blocks
         for i in range(num_blocks):
+            rot = math_utils.quat_from_euler_xyz(torch.tensor(0), torch.tensor(0), torch.rand(1) * 3.1415).reshape(-1).tolist()
+            size = (torch.tensor([0.035, 0.035, 0.035]) + 0.02 * torch.rand(3)).tolist()
+
             # set block attr
             setattr(self, f"block{i}", RigidObjectCfg(
                 prim_path="{ENV_REGEX_NS}/Block" + str(i),
                 spawn=sim_utils.CuboidCfg(
                     # random size between .1 and .15
-                    size= (0.05, 0.05, 0.05),
+                    size= size,
                     rigid_props=sim_utils.RigidBodyPropertiesCfg(),
                     # random mass between 0.5 and 1.5
-                    mass_props=sim_utils.MassPropertiesCfg(mass=0.5 + 1.0 * torch.rand(1).item()),
+                    mass_props=sim_utils.MassPropertiesCfg(mass=0.15),
                     collision_props=sim_utils.CollisionPropertiesCfg(),
                     # random color
-                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(random.random(), random.random(), random.random()), metallic=0.2)
+                    visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=COLORS[i%len(COLORS)], metallic=0.2)
                 ),
-                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.2 + 0.1 * i, -0.2, 0.025)),
+                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.2 + 0.1 * i, -0.2, size[2]/2), rot=rot),
             ))
 
-        # self.camera = CameraCfg(
-        #     prim_path="{ENV_REGEX_NS}/Robot/zedm_left_camera_frame/zedm_left_camera_optical_frame",
-        #     update_period=0.03,
-        #     height=480,
-        #     width=640,
-        #     data_types=["rgb", "distance_to_image_plane"],
-        #     spawn=sim_utils.PinholeCameraCfg(
-        #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
-        #     ),
-        #     offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.017), rot=(0,1,0,0), convention="ros"),
-        # )
+        self.left_camera = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/zedm_left_camera_frame/zedm_left_camera_optical_frame/Camera",
+            update_period=0.03,
+            height=480,
+            width=640,
+            data_types=["rgb", "distance_to_image_plane"],
+            spawn=sim_utils.PinholeCameraCfg(
+                focal_length=18.1, focus_distance=400.0, horizontal_aperture=34, clipping_range=(0.05, 1.0e5)
+            ),
+            offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.0), rot=(0,0,-1,0), convention="opengl"),
+        )
+
+        self.right_camera = CameraCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/zedm_right_camera_frame/zedm_right_camera_optical_frame/Camera",
+            update_period=0.03,
+            height=480,
+            width=640,
+            data_types=["rgb", "distance_to_image_plane"],
+            spawn=sim_utils.PinholeCameraCfg(
+                focal_length=18.1, focus_distance=400.0, horizontal_aperture=34, clipping_range=(0.05, 1.0e5)
+            ),
+            offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.0), rot=(0,0,-1,0), convention="opengl"),
+        )
 
         self.ee_contact_forces = ContactSensorCfg(
-            prim_path="{ENV_REGEX_NS}/Robot/suction", update_period=0.0, history_length=5, debug_vis=True
+            prim_path="{ENV_REGEX_NS}/Robot/suction", update_period=0.0, history_length=10, debug_vis=False
         )
 
 def limit_distance(cur_pos, target_pos, max_dist):
@@ -99,8 +122,9 @@ def limit_distance(cur_pos, target_pos, max_dist):
 
 class BlockStackingEnv:
 
-    def __init__(self, num_blocks):
+    def __init__(self, num_blocks, show_viz=True):
         self.num_blocks = num_blocks
+        self.show_viz = show_viz
  
         # Load kit helper
         self.sim_cfg = sim_utils.SimulationCfg(
@@ -162,10 +186,11 @@ class BlockStackingEnv:
         self.gripper.initialize()
 
         # Markers
-        self.frame_marker_cfg = FRAME_MARKER_CFG.copy()
-        self.frame_marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
-        self.ee_marker = VisualizationMarkers(self.frame_marker_cfg.replace(prim_path="/Visuals/ee_current"))
-        self.goal_marker = VisualizationMarkers(self.frame_marker_cfg.replace(prim_path="/Visuals/ee_goal"))
+        if show_viz:
+            self.frame_marker_cfg = FRAME_MARKER_CFG.copy()
+            self.frame_marker_cfg.markers["frame"].scale = (0.1, 0.1, 0.1)
+            self.ee_marker = VisualizationMarkers(self.frame_marker_cfg.replace(prim_path="/Visuals/ee_current"))
+            self.goal_marker = VisualizationMarkers(self.frame_marker_cfg.replace(prim_path="/Visuals/ee_goal"))
 
 
         # reset actions
@@ -183,7 +208,7 @@ class BlockStackingEnv:
         )
 
         #limit action translation to 0.1 by finding diff from ee_pos_b
-        action[0:3] = limit_distance(ee_pos_b.reshape(3), action[0:3], 0.05)
+        action[0:3] = limit_distance(ee_pos_b.reshape(3), action[0:3], 0.08)
 
         # DIFF IK
         self.diff_ik_controller.set_command(action[0:7].reshape(1, -1))
@@ -211,11 +236,12 @@ class BlockStackingEnv:
 
         # MARKERS
 
-        # obtain quantities from simulation
-        ee_pose_w = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7]
-        # update marker positions
-        self.ee_marker.visualize(ee_pose_w[:, 0:3], ee_pose_w[:, 3:7])
-        self.goal_marker.visualize(action[0:3].reshape(1, -1) + self.scene.env_origins, action[3:7].reshape(1, -1))
+        if self.show_viz:
+            # obtain quantities from simulation
+            ee_pose_w = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7]
+            # update marker positions
+            self.ee_marker.visualize(ee_pose_w[:, 0:3], ee_pose_w[:, 3:7])
+            self.goal_marker.visualize(action[0:3].reshape(1, -1) + self.scene.env_origins, action[3:7].reshape(1, -1))
 
     def reset(self):
         joint_pos = self.robot.data.default_joint_pos.clone()
@@ -247,6 +273,9 @@ class BlockStackingEnv:
         obs["ee_force"] = self.scene["ee_contact_forces"].data.net_forces_w.reshape(-1)
 
         obs["ee_pose"] = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7].reshape(-1)
+
+        # obs["left_camera"] = self.scene["left_camera"].data.output["rgb"]
+        # obs["right_camera"] = self.scene["right_camera"].data.output["rgb"]
 
         return obs
 

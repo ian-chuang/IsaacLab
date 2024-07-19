@@ -27,25 +27,26 @@ def main():
     # create the environment
     env = BlockStackingEnv(
         num_blocks=num_blocks,
+        show_viz=False,
     )
 
     env.reset()
 
     action = torch.tensor([0.5, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0])
 
-    def move_to_pose(simulation_app, env, pose, grasp, max_steps=200):
+    def move_to_pose(simulation_app, env, pose, grasp, max_steps=100):
         for i in range(max_steps):
             action[0:3] = pose[0:3]
             action[7] = 1.0 if grasp else 0.0
             env.step(action)
 
-            if (pose[0:3] - env.get_obs()["ee_pose"][0:3]).norm() < 0.001:
+            if (pose[0:3] - env.get_obs()["ee_pose"][0:3]).norm() < 0.005:
                 break
 
             if not simulation_app.is_running():
                 break
 
-    def move_until_touch(simulation_app, env, pose, grasp, max_steps=200, force_threshold=30.0):
+    def move_until_touch(simulation_app, env, pose, grasp, max_steps=100, force_threshold=30.0):
         for i in range(max_steps):
             action[0:3] = pose[0:3]
             action[7] = 1.0 if grasp else 0.0
@@ -54,7 +55,7 @@ def main():
 
             if obs["ee_force"].norm() > force_threshold:
                 break
-            if (pose[0:3] - obs["ee_pose"][0:3]).norm() < 0.001:
+            if (pose[0:3] - obs["ee_pose"][0:3]).norm() < 0.006:
                 break
             if not simulation_app.is_running():
                 break
@@ -73,19 +74,31 @@ def main():
         action[7] = 0.0
         env.step(action)
 
+    
+    import cv2
+
     # run the simulation
     while simulation_app.is_running():
         obs = env.get_obs()
 
+        height = 0
+
         for i in range(num_blocks):
             block_pose = obs[f"block{i}"]
+            place_pose = torch.tensor([0.3, 0.2, 0.0])
+
+            block_pose[0:2] += torch.randn(2) * 0.002
+            place_pose[0:2] += torch.randn(2) * 0.002
 
 
             # approach
             move_to_pose(simulation_app, env, block_pose + torch.tensor([0.0, 0.0, 0.1]), grasp=False)
 
             # touch
-            move_until_touch(simulation_app, env, block_pose, grasp=False)
+            move_until_touch(simulation_app, env, block_pose, grasp=False, force_threshold=5)
+
+            obs = env.get_obs()
+            height += obs["ee_pose"][2]
 
             # grasp
             grasp(env)
@@ -94,16 +107,16 @@ def main():
             move_to_pose(simulation_app, env, block_pose + torch.tensor([0.0, 0.0, 0.1]), grasp=True)
 
             # place approach
-            move_to_pose(simulation_app, env, torch.tensor([0.3, 0.2, 0.5]), grasp=True)
+            move_to_pose(simulation_app, env, place_pose + torch.tensor([0.0, 0.0, height+0.1]), grasp=True)
             
             # place
-            move_until_touch(simulation_app, env, torch.tensor([0.3, 0.2, 0.0]), grasp=True, force_threshold=40)
+            move_until_touch(simulation_app, env, place_pose + torch.tensor([0.0, 0.0, height+0.003]), grasp=True, force_threshold=30)
 
             # release
             release(env)
 
             # retract
-            move_to_pose(simulation_app, env, torch.tensor([0.3, 0.2, 0.5]), grasp=False)
+            move_to_pose(simulation_app, env, place_pose + torch.tensor([0.0, 0.0, height+0.1]), grasp=False)
             
 
         env.reset()
