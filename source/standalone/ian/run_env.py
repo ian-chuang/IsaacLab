@@ -33,6 +33,46 @@ def main():
 
     action = torch.tensor([0.5, 0.0, 0.5, 0.0, 1.0, 0.0, 0.0, 0.0])
 
+    def move_to_pose(simulation_app, env, pose, grasp, max_steps=200):
+        for i in range(max_steps):
+            action[0:3] = pose[0:3]
+            action[7] = 1.0 if grasp else 0.0
+            env.step(action)
+
+            if (pose[0:3] - env.get_obs()["ee_pose"][0:3]).norm() < 0.001:
+                break
+
+            if not simulation_app.is_running():
+                break
+
+    def move_until_touch(simulation_app, env, pose, grasp, max_steps=200, force_threshold=30.0):
+        for i in range(max_steps):
+            action[0:3] = pose[0:3]
+            action[7] = 1.0 if grasp else 0.0
+            env.step(action)
+            obs = env.get_obs()
+
+            if obs["ee_force"].norm() > force_threshold:
+                break
+            if (pose[0:3] - obs["ee_pose"][0:3]).norm() < 0.001:
+                break
+            if not simulation_app.is_running():
+                break
+
+    def grasp(env):
+        obs = env.get_obs()
+        action = torch.zeros(8)
+        action[0:7] = obs["ee_pose"]
+        action[7] = 1.0
+        env.step(action)
+
+    def release(env):
+        obs = env.get_obs()
+        action = torch.zeros(8)
+        action[0:7] = obs["ee_pose"]
+        action[7] = 0.0
+        env.step(action)
+
     # run the simulation
     while simulation_app.is_running():
         obs = env.get_obs()
@@ -42,64 +82,28 @@ def main():
 
 
             # approach
-            for i in range(150):
-                action[0:3] = block_pose[0:3] + torch.tensor([0.0, 0.0, 0.1])
-                action[7] = 0.0
-                env.step(action)
+            move_to_pose(simulation_app, env, block_pose + torch.tensor([0.0, 0.0, 0.1]), grasp=False)
 
             # touch
-            for i in range(150):
-                action[0:3] = block_pose[0:3] 
-                action[7] = 0.0
-                env.step(action)
-                obs = env.get_obs()
-                if obs["ee_force"].norm() > 20.0:
-                    break
+            move_until_touch(simulation_app, env, block_pose, grasp=False)
 
             # grasp
-            action[0:3] = block_pose[0:3] 
-            action[7] = 1.0
-            env.step(action)
+            grasp(env)
 
             # retract
-            for i in range(150):
-                action[0:3] = block_pose[0:3] + torch.tensor([0.0, 0.0, 0.1])
-                action[7] = 1.0
-                env.step(action)
-
-            # rest
-            for i in range(150):
-                action[0:3] = torch.tensor([0.5, 0.0, 0.5])
-                action[7] = 1.0
-                env.step(action)
+            move_to_pose(simulation_app, env, block_pose + torch.tensor([0.0, 0.0, 0.1]), grasp=True)
 
             # place approach
-            for i in range(150):
-                action[0:3] = torch.tensor([0.3, 0.0, 0.4])
-                action[7] = 1.0
-                env.step(action)
-                print( obs["ee_force"].norm())
+            move_to_pose(simulation_app, env, torch.tensor([0.3, 0.2, 0.5]), grasp=True)
             
             # place
-            for i in range(150):
-                action[0:3] = torch.tensor([0.3, 0.0, 0.0])
-                action[7] = 1.0
-                env.step(action)
-                obs = env.get_obs()
-                print( obs["ee_force"].norm())
-                if obs["ee_force"].norm() > 20.0:
-                    break
+            move_until_touch(simulation_app, env, torch.tensor([0.3, 0.2, 0.0]), grasp=True, force_threshold=40)
 
             # release
-            action[0:3] = torch.tensor([0.3, 0.0, 0.0])
-            action[7] = 0.0
-            env.step(action)
+            release(env)
 
             # retract
-            for i in range(150):
-                action[0:3] = torch.tensor([0.3, 0.0, 0.4])
-                action[7] = 0.0
-                env.step(action)
+            move_to_pose(simulation_app, env, torch.tensor([0.3, 0.2, 0.5]), grasp=False)
             
 
         env.reset()

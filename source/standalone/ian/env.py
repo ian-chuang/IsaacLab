@@ -71,7 +71,7 @@ class BlockStackingSceneCfg(InteractiveSceneCfg):
                     # random color
                     visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(random.random(), random.random(), random.random()), metallic=0.2)
                 ),
-                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.5, -0.2 + 0.1 * i, 0.025)),
+                init_state=RigidObjectCfg.InitialStateCfg(pos=(0.2 + 0.1 * i, -0.2, 0.025)),
             ))
 
         # self.camera = CameraCfg(
@@ -246,7 +246,7 @@ class BlockStackingEnv:
 
         obs["ee_force"] = self.scene["ee_contact_forces"].data.net_forces_w.reshape(-1)
 
-        obs["ee_pose"] = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7]
+        obs["ee_pose"] = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7].reshape(-1)
 
         return obs
 
