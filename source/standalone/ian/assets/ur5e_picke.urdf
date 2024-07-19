@@ -733,7 +733,7 @@
     <parent link="picke"/>
     <child link="screw"/>
   </joint>
-  <joint name="suction_joint" type="fixed">
+  <joint name="suction_joint" type="fixed" dont_collapse="true">
     <origin rpy="0 0 0" xyz="-0.0 -0.0 0.0463"/>
     <parent link="screw"/>
     <child link="suction"/>
@@ -744,4 +744,6 @@
     <child link="tcp"/>
   </joint>
 </robot>
+
+
 

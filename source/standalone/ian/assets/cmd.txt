@@ -1,0 +1,1 @@
+isaaclab.bat -p source/standalone/tools/convert_urdf.py C:\Users\iantc\GitHub\IsaacLab\source\standalone\ian\assets\ur5e_picke.urdf C:\Users\iantc\GitHub\IsaacLab\source\standalone\ian\assets\ur5e_picke.usd --merge-joints --make-instanceable --fix-base

@@ -75,16 +75,26 @@ class BlockStackingSceneCfg(InteractiveSceneCfg):
             ))
 
         # self.camera = CameraCfg(
-        #     prim_path="{ENV_REGEX_NS}/Robot/base/front_cam",
-        #     update_period=0.1,
+        #     prim_path="{ENV_REGEX_NS}/Robot/zedm_left_camera_frame/zedm_left_camera_optical_frame",
+        #     update_period=0.03,
         #     height=480,
         #     width=640,
         #     data_types=["rgb", "distance_to_image_plane"],
         #     spawn=sim_utils.PinholeCameraCfg(
         #         focal_length=24.0, focus_distance=400.0, horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5)
         #     ),
-        #     offset=CameraCfg.OffsetCfg(pos=(0.510, 0.0, 0.015), rot=(0.5, -0.5, 0.5, -0.5), convention="ros"),
+        #     offset=CameraCfg.OffsetCfg(pos=(0.0, 0.0, 0.017), rot=(0,1,0,0), convention="ros"),
         # )
+
+        self.ee_contact_forces = ContactSensorCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/suction", update_period=0.0, history_length=5, debug_vis=True
+        )
+
+def limit_distance(cur_pos, target_pos, max_dist):
+    dist = torch.norm(target_pos - cur_pos)
+    if dist > max_dist:
+        return cur_pos + (target_pos - cur_pos) * max_dist / dist
+    return target_pos
 
 
 class BlockStackingEnv:
@@ -162,8 +172,6 @@ class BlockStackingEnv:
         self.ee_goal = torch.tensor([0.5, 0, 0.5, 0.0, 1.0, 0.0, 0.0], device=self.sim.device)
 
     def step(self, action: torch.Tensor):
-        # DIFF IK
-        self.diff_ik_controller.set_command(action[0:7].reshape(1, -1))
         # obtain quantities from simulation
         jacobian = self.robot.root_physx_view.get_jacobians()[:, self.ee_jacobi_idx, :, self.robot_entity_cfg.joint_ids]
         ee_pose_w = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7]
@@ -173,6 +181,13 @@ class BlockStackingEnv:
         ee_pos_b, ee_quat_b = subtract_frame_transforms(
             root_pose_w[:, 0:3], root_pose_w[:, 3:7], ee_pose_w[:, 0:3], ee_pose_w[:, 3:7]
         )
+
+        #limit action translation to 0.1 by finding diff from ee_pos_b
+        action[0:3] = limit_distance(ee_pos_b.reshape(3), action[0:3], 0.05)
+
+        # DIFF IK
+        self.diff_ik_controller.set_command(action[0:7].reshape(1, -1))
+
         # compute the joint commands
         joint_pos_des = self.diff_ik_controller.compute(ee_pos_b, ee_quat_b, jacobian, joint_pos)
 
@@ -219,6 +234,7 @@ class BlockStackingEnv:
         # reset gripper
         if self.gripper.is_closed():
             self.gripper.open()
+            
 
     def get_obs(self):
         obs = {}
@@ -227,6 +243,10 @@ class BlockStackingEnv:
             object_data = block.data
             object_position = object_data.root_pos_w - self.scene.env_origins
             obs[f"block{i}"] = object_position[0]
+
+        obs["ee_force"] = self.scene["ee_contact_forces"].data.net_forces_w.reshape(-1)
+
+        obs["ee_pose"] = self.robot.data.body_state_w[:, self.robot_entity_cfg.body_ids[0], 0:7]
 
         return obs
 

@@ -10,7 +10,7 @@ UR5e_PICKe_CFG = ArticulationCfg(
             disable_gravity=False,
             max_depenetration_velocity=5.0,
         ),
-        activate_contact_sensors=False,
+        activate_contact_sensors=True,
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         joint_pos={
@@ -25,7 +25,7 @@ UR5e_PICKe_CFG = ArticulationCfg(
     actuators={
         "arm": ImplicitActuatorCfg(
             joint_names_expr=[".*"],
-            velocity_limit=100.0,
+            velocity_limit=3.14,
             effort_limit=87.0,
             stiffness=400.0,
             damping=80.0,

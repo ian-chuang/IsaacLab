@@ -35,7 +35,6 @@ def main():
 
     # run the simulation
     while simulation_app.is_running():
-
         obs = env.get_obs()
 
         for i in range(num_blocks):
@@ -43,16 +42,19 @@ def main():
 
 
             # approach
-            for i in range(50):
+            for i in range(150):
                 action[0:3] = block_pose[0:3] + torch.tensor([0.0, 0.0, 0.1])
                 action[7] = 0.0
                 env.step(action)
 
             # touch
-            for i in range(50):
+            for i in range(150):
                 action[0:3] = block_pose[0:3] 
                 action[7] = 0.0
                 env.step(action)
+                obs = env.get_obs()
+                if obs["ee_force"].norm() > 20.0:
+                    break
 
             # grasp
             action[0:3] = block_pose[0:3] 
@@ -60,43 +62,47 @@ def main():
             env.step(action)
 
             # retract
-            for i in range(50):
+            for i in range(150):
                 action[0:3] = block_pose[0:3] + torch.tensor([0.0, 0.0, 0.1])
                 action[7] = 1.0
                 env.step(action)
 
             # rest
-            for i in range(50):
+            for i in range(150):
                 action[0:3] = torch.tensor([0.5, 0.0, 0.5])
                 action[7] = 1.0
                 env.step(action)
 
             # place approach
-            for i in range(50):
-                action[0:3] = torch.tensor([0.7, 0.0, 0.03]) + torch.tensor([0.0, 0.0, 0.1])
+            for i in range(150):
+                action[0:3] = torch.tensor([0.3, 0.0, 0.4])
                 action[7] = 1.0
                 env.step(action)
+                print( obs["ee_force"].norm())
             
             # place
-            for i in range(50):
-                action[0:3] = torch.tensor([0.7, 0.0, 0.03])
+            for i in range(150):
+                action[0:3] = torch.tensor([0.3, 0.0, 0.0])
                 action[7] = 1.0
                 env.step(action)
+                obs = env.get_obs()
+                print( obs["ee_force"].norm())
+                if obs["ee_force"].norm() > 20.0:
+                    break
 
             # release
-            action[0:3] = torch.tensor([0.7, 0.0, 0.03])
+            action[0:3] = torch.tensor([0.3, 0.0, 0.0])
             action[7] = 0.0
             env.step(action)
 
             # retract
-            for i in range(50):
-                action[0:3] = torch.tensor([0.7, 0.0, 0.03]) + torch.tensor([0.0, 0.0, 0.1])
+            for i in range(150):
+                action[0:3] = torch.tensor([0.3, 0.0, 0.4])
                 action[7] = 0.0
                 env.step(action)
             
 
         env.reset()
-
 
 if __name__ == "__main__":
     # run the main function
