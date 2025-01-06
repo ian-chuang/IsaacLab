@@ -1,0 +1,22 @@
+mesh importer
+
+isaaclab.bat -p source/standalone/tools/convert_mesh.py "C:\Users\iantc\Downloads\ft_sensor.obj" "C:\Users\iantc\Downloads\ft_sensor.usd" --make-instanceable --collision-approximation convexDecomposition --mass 0.5
+
+.069399
+
+isaacsim omni.isaac.sim.python.kit
+
+
+Maybe download nucleus server to get assets
+Go to content and load in assets localhost/Isaac/.../Robots/
+In Fusion export mesh as obj in m and use mesh converter 
+Load in all your assets and save as flattened and open the flattened
+Make everything not instanceable
+Convert all references to payload and save as flattened again
+Add rigid joints by putting main robot xform to origin
+Then can change positions correctly to move gripper to robot
+Then create a fixed joint connecting joints
+Can also change color
+Remove root articulation in all robots except root prim
+
+
