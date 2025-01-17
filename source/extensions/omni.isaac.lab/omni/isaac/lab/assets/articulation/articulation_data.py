@@ -1,4 +1,4 @@
-# Copyright (c) 2022-2024, The Isaac Lab Project Developers.
+# Copyright (c) 2022-2025, The Isaac Lab Project Developers.
 # All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
@@ -547,7 +547,7 @@ class ArticulationData:
 
         This quantity is the position of the actor frame of the root rigid body relative to the world.
         """
-        if self._body_com_state_w.timestamp < self._sim_timestamp:
+        if self._root_link_state_w.timestamp < self._sim_timestamp:
             # read data from simulation (pose is of link)
             pose = self._root_physx_view.get_root_transforms()
             return pose[:, :3]
@@ -559,7 +559,7 @@ class ArticulationData:
 
         This quantity is the orientation of the actor frame of the root rigid body.
         """
-        if self._body_com_state_w.timestamp < self._sim_timestamp:
+        if self._root_link_state_w.timestamp < self._sim_timestamp:
             # read data from simulation (pose is of link)
             pose = self._root_physx_view.get_root_transforms().clone()
             pose[:, 3:7] = math_utils.convert_quat(pose[:, 3:7], to="wxyz")
@@ -747,7 +747,7 @@ class ArticulationData:
 
     @property
     def body_link_pos_w(self) -> torch.Tensor:
-        """Positions of all bodies in simulation world frame. Shape is (num_instances, 1, 3).
+        """Positions of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 3).
 
         This quantity is the position of the rigid bodies' actor frame relative to the world.
         """
@@ -760,7 +760,7 @@ class ArticulationData:
 
     @property
     def body_link_quat_w(self) -> torch.Tensor:
-        """Orientation (w, x, y, z) of all bodies in simulation world frame. Shape is (num_instances, 1, 4).
+        """Orientation (w, x, y, z) of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 4).
 
         This quantity is the orientation of the rigid bodies' actor frame  relative to the world.
         """
@@ -774,7 +774,7 @@ class ArticulationData:
 
     @property
     def body_link_vel_w(self) -> torch.Tensor:
-        """Velocity of all bodies in simulation world frame. Shape is (num_instances, 1, 6).
+        """Velocity of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 6).
 
         This quantity contains the linear and angular velocities of the rigid bodies' center of mass frame
         relative to the world.
@@ -783,7 +783,7 @@ class ArticulationData:
 
     @property
     def body_link_lin_vel_w(self) -> torch.Tensor:
-        """Linear velocity of all bodies in simulation world frame. Shape is (num_instances, 1, 3).
+        """Linear velocity of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 3).
 
         This quantity is the linear velocity of the rigid bodies' center of mass frame relative to the world.
         """
@@ -791,7 +791,7 @@ class ArticulationData:
 
     @property
     def body_link_ang_vel_w(self) -> torch.Tensor:
-        """Angular velocity of all bodies in simulation world frame. Shape is (num_instances, 1, 3).
+        """Angular velocity of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 3).
 
         This quantity is the angular velocity of the rigid bodies' center of mass frame relative to the world.
         """
@@ -803,7 +803,7 @@ class ArticulationData:
 
     @property
     def body_com_pos_w(self) -> torch.Tensor:
-        """Positions of all bodies in simulation world frame. Shape is (num_instances, 1, 3).
+        """Positions of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 3).
 
         This quantity is the position of the rigid bodies' actor frame.
         """
@@ -813,13 +813,13 @@ class ArticulationData:
     def body_com_quat_w(self) -> torch.Tensor:
         """Orientation (w, x, y, z) of the prinicple axies of inertia of all bodies in simulation world frame.
 
-        Shape is (num_instances, 1, 4). This quantity is the orientation of the rigid bodies' actor frame.
+        Shape is (num_instances, num_bodies, 4). This quantity is the orientation of the rigid bodies' actor frame.
         """
         return self.body_com_state_w[..., 3:7]
 
     @property
     def body_com_vel_w(self) -> torch.Tensor:
-        """Velocity of all bodies in simulation world frame. Shape is (num_instances, 1, 6).
+        """Velocity of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 6).
 
         This quantity contains the linear and angular velocities of the rigid bodies' center of mass frame.
         """
@@ -832,7 +832,7 @@ class ArticulationData:
 
     @property
     def body_com_lin_vel_w(self) -> torch.Tensor:
-        """Linear velocity of all bodies in simulation world frame. Shape is (num_instances, 1, 3).
+        """Linear velocity of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 3).
 
         This quantity is the linear velocity of the rigid bodies' center of mass frame.
         """
@@ -845,7 +845,7 @@ class ArticulationData:
 
     @property
     def body_com_ang_vel_w(self) -> torch.Tensor:
-        """Angular velocity of all bodies in simulation world frame. Shape is (num_instances, 1, 3).
+        """Angular velocity of all bodies in simulation world frame. Shape is (num_instances, num_bodies, 3).
 
         This quantity is the angular velocity of the rigid bodies' center of mass frame.
         """
